@@ -16,7 +16,7 @@ import (
 	"github.com/tczekajlo/kube-consul-register/utils"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
+	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/tools/cache"
@@ -223,7 +223,7 @@ func (c *Controller) Sync() error {
 			// container from addedContainers map and call update.
 			if _, ok := addedConsulServices[serviceID]; !ok {
 				delete(addedContainers, container.ContainerID)
-				if err := eventUpdateFunc(&pod, c.consulInstance, c.cfg); err != nil {
+				if err := c.eventUpdateFunc(&pod, c.consulInstance, c.cfg); err != nil {
 					glog.Errorf("Failed to sync pod: %s: %s", podInfo.Name, err)
 				}
 			}
@@ -277,7 +277,7 @@ func (c *Controller) Watch() {
 					return
 				}
 				c.mutex.Lock()
-				if err := eventUpdateFunc(newObj, c.consulInstance, c.cfg); err != nil {
+				if err := c.eventUpdateFunc(newObj, c.consulInstance, c.cfg); err != nil {
 					glog.Errorf("Failed to update pods: %s", err)
 				}
 				c.mutex.Unlock()
@@ -347,7 +347,7 @@ func eventDeleteFunc(obj interface{}, consulInstance consul.Adapter, cfg *config
 	return nil
 }
 
-func eventUpdateFunc(obj interface{}, consulInstance consul.Adapter, cfg *config.Config) error {
+func (c *Controller) eventUpdateFunc(obj interface{}, consulInstance consul.Adapter, cfg *config.Config) error {
 	podInfo := &PodInfo{}
 	podInfo.save(obj)
 
@@ -383,6 +383,19 @@ func eventUpdateFunc(obj interface{}, consulInstance consul.Adapter, cfg *config
 					glog.Errorf("Can't convert POD to Consul's service: %s", err)
 					metrics.PodFailure.WithLabelValues("update").Inc()
 					continue
+				}
+
+				// Add node ips to service meta
+				node, err := c.clientset.CoreV1().Nodes().Get(podInfo.NodeName)
+				if err == nil {
+					for _, address := range node.Status.Addresses {
+						if address.Type == v1.NodeInternalIP {
+							service.Meta["NodeInternalIP"] = address.Address
+						}
+						if address.Type == v1.NodeExternalIP {
+							service.Meta["NodeExternalIP"] = address.Address
+						}
+					}
 				}
 
 				// Consul Agent
