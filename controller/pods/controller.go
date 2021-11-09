@@ -38,7 +38,7 @@ const (
 	ConsulRegisterServiceMetaPrefixAnnotation string = "consul.register/service.meta."
 	CreatedByAnnotation                       string = "kubernetes.io/created-by"
 	ExpectedContainerNamesAnnotation          string = "consul.register/pod.container.name"
-	ContainerProbeLivenessAnnotation          string = "consul.register/pod.container.probe.liveness"
+  ContainerProbeLivenessAnnotation          string = "consul.register/pod.container.probe.liveness"
 	ContainerProbeReadinessAnnotation         string = "consul.register/pod.container.probe.readiness"
 )
 
